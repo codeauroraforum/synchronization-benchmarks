@@ -33,9 +33,9 @@
 #define __LOCKHAMMER_H__
 
 struct thread_args {
+    unsigned long corenum;
     unsigned long ncores;
     unsigned long nthrds;
-    unsigned long ileave;
     unsigned long iter;
     unsigned long *lock;
     unsigned long *rst;

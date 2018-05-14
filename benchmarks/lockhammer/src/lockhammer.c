@@ -180,10 +180,16 @@ int main(int argc, char** argv)
 
     thread_args t_args[args.nthrds];
     for (i = 0; i < args.nthrds; ++i) {
+        cpu_set_t affin_mask;
+
+        CPU_ZERO(&affin_mask);
+        CPU_SET(((i * num_cores / args.ileave) % num_cores + (i / args.ileave)), &affin_mask);
+        pthread_attr_setaffinity_np(&hmr_attr, sizeof(affin_mask), &affin_mask);
+
         hmrs[i] = 0;
+        t_args[i].corenum = i;
         t_args[i].ncores = num_cores;
         t_args[i].nthrds = args.nthrds;
-        t_args[i].ileave = args.ileave;
         t_args[i].iter = args.nacqrs;
         t_args[i].lock = &test_lock;
         t_args[i].rst = &hmrs[i];
@@ -242,44 +248,32 @@ void* hmr(void *ptr)
     unsigned long *lock = x->lock;
     unsigned long target_locks = x->iter;
     unsigned long ncores = x->ncores;
-    unsigned long ileave = x->ileave;
     unsigned long nthrds = x->nthrds;
     unsigned long hold_count = x->hold;
     unsigned long post_count = x->post;
 
-    unsigned long mycore = 0;
+    unsigned long mycore = x->corenum;
+    unsigned long queueorder = 0;
 
     struct timespec tv_monot_start, tv_start, tv_end;
     unsigned long ns_elap;
     unsigned long total_depth = 0;
 
-    cpu_set_t affin_mask;
-
-    CPU_ZERO(&affin_mask);
-
     /* Coordinate synchronized start of all lock threads to maximize
        time under which locks are stressed to the requested contention
        level */
-    mycore = fetchadd64_acquire(&sync_lock, 2) >> 1;
+    queueorder = fetchadd64_acquire(&sync_lock, 2) >> 1;
 
-    if (mycore == 0) {
+    if (queueorder == 0) {
         /* First core to register is a "marshal" who waits for subsequent
            cores to become ready and starts all cores with a write to the
            shared memory location */
-
-        /* Set affinity to core 0 */
-        CPU_SET(0, &affin_mask);
-        sched_setaffinity(0, sizeof(cpu_set_t), &affin_mask);
-
         /* Spin until the appropriate numer of threads have become ready */
         wait64(&ready_lock, nthrds - 1);
         clock_gettime(CLOCK_MONOTONIC, &tv_monot_start);
         fetchadd64_release(&sync_lock, 1);
     }
     else {
-        /* Calculate affinity mask for my core and set affinity */
-        CPU_SET(((mycore * ncores / ileave) % ncores + (mycore / ileave)), &affin_mask);
-        sched_setaffinity(0, sizeof(cpu_set_t), &affin_mask);
         fetchadd64_release(&ready_lock, 1);
 
         /* Spin until the "marshal" sets the appropriate bit */
