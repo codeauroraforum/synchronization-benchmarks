@@ -14,6 +14,8 @@ TEST_TARGETS=lh_swap_mutex \
 	lh_cas_lockref \
 	lh_cas_rw_lock \
 	lh_incdec_refcount \
+	lh_incdec_acqrel_refcount \
+	lh_incdec_seq_refcount \
 	lh_ticket_spinlock \
 	lh_queued_spinlock \
 	lh_empty \
