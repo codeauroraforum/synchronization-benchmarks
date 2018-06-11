@@ -30,6 +30,7 @@
  */
 
 #include <stdint.h>
+#include <sched.h>
 
 #ifndef __LH_ATOMICS_H_
 #define __LH_ATOMICS_H_
@@ -73,6 +74,34 @@ static inline void wait64 (unsigned long *lock, unsigned long val) {
 	volatile unsigned long *v = lock;
 
 	while (*v != val);
+	#endif
+}
+
+static inline void wait64_yield (unsigned long *lock, unsigned long val) {
+	#if defined(__aarch64__)
+	unsigned long tmp;
+
+	asm volatile(
+	"	ldar	%[tmp], %[lock]\n"
+	: [tmp] "=&r" (tmp)
+	: [lock] "Q" (*lock)
+	: );
+
+	while (tmp != val) {
+		sched_yield();
+
+		asm volatile(
+		"	ldar	%[tmp], %[lock]\n"
+		: [tmp] "=&r" (tmp)
+		: [lock] "Q" (*lock)
+		: );
+	}
+	#else
+	volatile unsigned long *v = lock;
+
+	while (*v != val) {
+		sched_yield();
+	}
 	#endif
 }
 

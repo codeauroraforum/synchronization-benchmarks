@@ -346,7 +346,7 @@ void* hmr(void *ptr)
         sched_setaffinity(0, sizeof(cpu_set_t), &affin_mask);
 
         /* Spin until the appropriate numer of threads have become ready */
-        wait64(&ready_lock, nthrds - 1);
+        wait64_yield(&ready_lock, nthrds - 1);
         fetchadd64_release(&sync_lock, 1);
 
         calibrate_timer(x, mycore);
